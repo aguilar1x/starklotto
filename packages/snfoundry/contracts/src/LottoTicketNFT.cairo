@@ -1,6 +1,6 @@
+use core::serde::Serde;
 use starknet::ContractAddress;
 use starknet::storage::Map;
-use core::serde::Serde;
 
 /// Enum representing the status of a lottery ticket
 #[derive(Drop, Copy, Serde, starknet::Store)]
@@ -8,7 +8,7 @@ use core::serde::Serde;
 enum LottoStatus {
     Active,
     Completed,
-    Claimed
+    Claimed,
 }
 
 /// Structure that stores the details of an NFT ticket
@@ -21,7 +21,7 @@ struct TicketDetails {
     is_winner: bool,
     prize_amount: u256,
     timestamp: u64,
-    lotto_status: LottoStatus
+    lotto_status: LottoStatus,
 }
 
 //=======================================================================================
@@ -39,14 +39,14 @@ trait ILottoTicketNFT<TContractState> {
 
     // Lottery management functions
     fn mint_ticket(
-        ref self: TContractState, 
-        to: ContractAddress, 
-        lotto_id: u64, 
+        ref self: TContractState,
+        to: ContractAddress,
+        lotto_id: u64,
         num1: u16,
         num2: u16,
         num3: u16,
         num4: u16,
-        num5: u16
+        num5: u16,
     ) -> u256;
 
     fn update_ticket_status(
@@ -54,7 +54,7 @@ trait ILottoTicketNFT<TContractState> {
         token_id: u256,
         is_winner: bool,
         prize_amount: u256,
-        lotto_status: LottoStatus
+        lotto_status: LottoStatus,
     );
 
     // Admin functions
@@ -65,13 +65,15 @@ trait ILottoTicketNFT<TContractState> {
 /// Implementation of the LottoTicketNFT contract
 #[starknet::contract]
 mod LottoTicketNFT {
-    use starknet::{ContractAddress, contract_address_const, get_caller_address, get_block_timestamp};
-    use openzeppelin_token::erc721::{ERC721Component, ERC721HooksEmptyImpl};
-    use openzeppelin_token::erc721::interface::{IERC721, IERC721Metadata};
-    use openzeppelin_introspection::src5::SRC5Component;
     use openzeppelin_access::ownable::OwnableComponent;
+    use openzeppelin_introspection::src5::SRC5Component;
+    use openzeppelin_token::erc721::interface::{IERC721, IERC721Metadata};
+    use openzeppelin_token::erc721::{ERC721Component, ERC721HooksEmptyImpl};
     use starknet::storage::Map;
-    use super::{TicketDetails, LottoStatus, ILottoTicketNFT};
+    use starknet::{
+        ContractAddress, contract_address_const, get_block_timestamp, get_caller_address,
+    };
+    use super::{ILottoTicketNFT, LottoStatus, TicketDetails};
 
     /// OpenZeppelin Components
     component!(path: ERC721Component, storage: erc721, event: ERC721Event);
@@ -87,12 +89,11 @@ mod LottoTicketNFT {
         src5: SRC5Component::Storage,
         #[substorage(v0)]
         ownable: OwnableComponent::Storage,
-
         // Custom storage
         ticket_details: Map<u256, TicketDetails>,
         lottery_contract: ContractAddress,
         ticket_counter: u256,
-        base_uri: ByteArray
+        base_uri: ByteArray,
     }
 
     /// Events
@@ -104,7 +105,7 @@ mod LottoTicketNFT {
         owner: ContractAddress,
         lotto_id: u64,
         numbers: (u16, u16, u16, u16, u16),
-        timestamp: u64
+        timestamp: u64,
     }
 
     #[derive(Drop, starknet::Event)]
@@ -113,7 +114,7 @@ mod LottoTicketNFT {
         token_id: u256,
         is_winner: bool,
         prize_amount: u256,
-        lotto_status: LottoStatus
+        lotto_status: LottoStatus,
     }
 
     #[derive(Drop, starknet::Event)]
@@ -122,7 +123,7 @@ mod LottoTicketNFT {
         token_id: u256,
         #[key]
         from: ContractAddress,
-        to: ContractAddress
+        to: ContractAddress,
     }
 
     #[event]
@@ -136,7 +137,7 @@ mod LottoTicketNFT {
         OwnableEvent: OwnableComponent::Event,
         TicketMinted: TicketMinted,
         TicketStatusUpdated: TicketStatusUpdated,
-        TransferBlocked: TransferBlocked
+        TransferBlocked: TransferBlocked,
     }
 
     // Component implementations
@@ -155,10 +156,7 @@ mod LottoTicketNFT {
     #[generate_trait]
     impl BlockTransfersHooksImpl of BlockTransfersHooksTrait {
         fn before_token_transfer(
-            ref self: ContractState, 
-            from: ContractAddress, 
-            to: ContractAddress, 
-            token_id: u256
+            ref self: ContractState, from: ContractAddress, to: ContractAddress, token_id: u256,
         ) -> bool {
             // Allow minting (from zero address)
             if from == contract_address_const::<0>() {
@@ -178,7 +176,7 @@ mod LottoTicketNFT {
         owner: ContractAddress,
         name: ByteArray,
         symbol: ByteArray,
-        base_uri: ByteArray
+        base_uri: ByteArray,
     ) {
         // Initialize components
         // Clone base_uri since we need to use it twice
@@ -231,21 +229,20 @@ mod LottoTicketNFT {
         }
 
         fn mint_ticket(
-            ref self: ContractState, 
-            to: ContractAddress, 
-            lotto_id: u64, 
+            ref self: ContractState,
+            to: ContractAddress,
+            lotto_id: u64,
             num1: u16,
             num2: u16,
             num3: u16,
             num4: u16,
-            num5: u16
+            num5: u16,
         ) -> u256 {
             // Only lottery contract or owner can mint tickets
             let caller = get_caller_address();
             assert(
-                caller == self.lottery_contract.read() || 
-                caller == self.ownable.owner(),
-                'Only lottery can mint'
+                caller == self.lottery_contract.read() || caller == self.ownable.owner(),
+                'Only lottery can mint',
             );
 
             // Generate a unique token ID
@@ -265,7 +262,7 @@ mod LottoTicketNFT {
                 is_winner: false,
                 prize_amount: 0,
                 timestamp: current_time,
-                lotto_status: LottoStatus::Active
+                lotto_status: LottoStatus::Active,
             };
 
             // Store ticket metadata
@@ -275,15 +272,12 @@ mod LottoTicketNFT {
             self.erc721.mint(to, token_id);
 
             // Emit event
-            self.emit(
-                TicketMinted {
-                    token_id,
-                    owner: to,
-                    lotto_id,
-                    numbers,
-                    timestamp: current_time
-                }
-            );
+            self
+                .emit(
+                    TicketMinted {
+                        token_id, owner: to, lotto_id, numbers, timestamp: current_time,
+                    },
+                );
 
             token_id
         }
@@ -293,14 +287,13 @@ mod LottoTicketNFT {
             token_id: u256,
             is_winner: bool,
             prize_amount: u256,
-            lotto_status: LottoStatus
+            lotto_status: LottoStatus,
         ) {
             // Only lottery contract or owner can update ticket status
             let caller = get_caller_address();
             assert(
-                caller == self.lottery_contract.read() || 
-                caller == self.ownable.owner(),
-                'Only lottery can update'
+                caller == self.lottery_contract.read() || caller == self.ownable.owner(),
+                'Only lottery can update',
             );
 
             // Ensure the token exists
@@ -318,21 +311,14 @@ mod LottoTicketNFT {
                 is_winner: is_winner,
                 prize_amount: prize_amount,
                 timestamp: ticket_details.timestamp,
-                lotto_status: lotto_status
+                lotto_status: lotto_status,
             };
 
             // Save updated details
             self.ticket_details.write(token_id, updated_details);
 
             // Emit event
-            self.emit(
-                TicketStatusUpdated {
-                    token_id,
-                    is_winner,
-                    prize_amount,
-                    lotto_status
-                }
-            );
+            self.emit(TicketStatusUpdated { token_id, is_winner, prize_amount, lotto_status });
         }
 
         fn set_lottery_contract(ref self: ContractState, lottery_contract: ContractAddress) {
@@ -347,4 +333,4 @@ mod LottoTicketNFT {
             self.base_uri.write(base_uri);
         }
     }
-} 
+}
